@@ -484,21 +484,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 return (
                   <div
                     key={risk.id}
-                    className={`border rounded-xl p-4 space-y-3 transition-all relative flex flex-col justify-between ${
+                    onClick={() => onSelectRisk(risk.id)}
+                    className={`border rounded-xl p-4 space-y-3 transition-all relative flex flex-col justify-between cursor-pointer ${
                       isSelected
                         ? isDarkMode
-                          ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/30'
-                          : 'bg-cyan-50/80 border-cyan-400 ring-1 ring-cyan-400/30'
+                          ? 'bg-cyan-950/40 border-2 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg shadow-cyan-500/10'
+                          : 'bg-cyan-50/90 border-2 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg shadow-cyan-500/10'
                         : isDarkMode
-                        ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                        : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-white'
                     }`}
                   >
                     <div className="space-y-2">
                       {/* Card Header: Risk ID & Severity Tag */}
                       <div className="flex items-center justify-between gap-2 border-b pb-2 border-slate-200 dark:border-slate-800/80">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 font-mono text-[10px] font-bold">
+                          <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold border transition-colors ${
+                            isSelected
+                              ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-sm'
+                              : 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30'
+                          }`}>
                             {risk.id}
                           </span>
                           {renderSeverityTag(risk.severity)}
@@ -506,14 +511,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => onSelectRisk(risk.id)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectRisk(risk.id);
+                            }}
                             className="p-1 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
                             title="Inspect/Edit Risk"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => onDeleteRisk(risk.id)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteRisk(risk.id);
+                            }}
                             className="p-1 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
                             title="Delete Risk"
                           >
@@ -548,10 +561,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </div>
 
                       <button
-                        onClick={() => onSelectRisk(risk.id)}
-                        className="px-2.5 py-1 text-[11px] font-bold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 rounded-md transition-colors"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectRisk(risk.id);
+                        }}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors flex items-center gap-1 ${
+                          isSelected
+                            ? 'bg-cyan-600 text-white shadow-sm'
+                            : 'text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10'
+                        }`}
                       >
-                        Inspect →
+                        <span>{isSelected ? 'Selected ✓' : 'Inspect →'}</span>
                       </button>
                     </div>
                   </div>
@@ -589,9 +610,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     return (
                       <tr 
                         key={risk.id} 
-                        className={`transition-colors ${
+                        onClick={() => onSelectRisk(risk.id)}
+                        className={`transition-colors cursor-pointer ${
                           isSelected 
-                            ? isDarkMode ? 'bg-cyan-500/10' : 'bg-cyan-50' 
+                            ? isDarkMode
+                              ? 'bg-cyan-500/20 text-cyan-200 border-l-4 border-l-cyan-400 font-medium' 
+                              : 'bg-cyan-50 text-cyan-900 border-l-4 border-l-cyan-500 font-medium' 
                             : isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
                         }`}
                       >
@@ -629,14 +653,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                         <td className="py-3 px-3 text-right space-x-2">
                           <button
-                            onClick={() => onSelectRisk(risk.id)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectRisk(risk.id);
+                            }}
                             className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
                             title="Inspect/Edit"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => onDeleteRisk(risk.id)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteRisk(risk.id);
+                            }}
                             className="p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
                             title="Delete Risk"
                           >
