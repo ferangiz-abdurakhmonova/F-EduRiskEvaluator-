@@ -1,0 +1,6 @@
+{
+  "name": "F-EduRiskEvaluator",
+  "description": "An interactive risk assessment dashboard for students and lecturers with anti-copy/paste protection, Google AI Studio Gemini evaluation, Recharts risk matrix, and PDF submission.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
