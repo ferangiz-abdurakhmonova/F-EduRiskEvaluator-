@@ -161,35 +161,51 @@ export default function App() {
     };
   }, [roomCode]);
 
-  // Sync risks over WS on update
+  // Sync risks & fetch connected peers continuously (every 4 seconds + on change)
   useEffect(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'update_risks',
-        roomCode,
-        studentId,
-        studentName: risks[0]?.studentName || 'Student Anonymous',
-        studentGroup: risks[0]?.studentGroup || 'Risk Group',
-        risks
-      }));
-    } else {
-      // HTTP Fallback sync
+    const doSync = () => {
+      const studentName = risks[0]?.studentName || 'Student Anonymous';
+      const studentGroup = risks[0]?.studentGroup || 'Risk Group';
+
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'update_risks',
+          roomCode,
+          studentId,
+          studentName,
+          studentGroup,
+          risks
+        }));
+      }
+
+      // HTTP Polling sync fallback
       fetch('/api/room/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomCode,
           studentId,
-          studentName: risks[0]?.studentName || 'Student Anonymous',
-          studentGroup: risks[0]?.studentGroup || 'Risk Group',
+          studentName,
+          studentGroup,
           risks
         })
-      }).then(r => r.json()).then(data => {
-        if (data && Array.isArray(data.students)) {
-          setActivePeers(data.students);
-        }
-      }).catch(() => {});
-    }
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data && Array.isArray(data.students)) {
+            setActivePeers(data.students);
+          }
+        })
+        .catch(() => {});
+    };
+
+    // Immediate sync on load or state update
+    doSync();
+
+    // Continuous 4-second polling timer
+    const pollInterval = setInterval(doSync, 4000);
+
+    return () => clearInterval(pollInterval);
   }, [risks, roomCode, studentId]);
 
   // Toggle body dark class

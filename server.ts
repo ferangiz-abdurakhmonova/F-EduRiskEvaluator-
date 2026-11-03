@@ -188,18 +188,44 @@ wss.on('connection', (ws) => {
   });
 });
 
-// REST Fallback routes for room state
-app.post("/api/room/sync", (req, res) => {
-  const { roomCode, studentId, studentName, studentGroup, risks } = req.body;
+// Helper to prune inactive sessions older than 15 minutes
+function pruneStaleStudents(room: RoomData) {
+  const now = Date.now();
+  const maxInactiveMs = 15 * 60 * 1000; // 15 minutes
+  for (const [sId, session] of room.students.entries()) {
+    if (now - session.lastActive > maxInactiveMs) {
+      room.students.delete(sId);
+    }
+  }
+}
+
+// REST Fallback & Polling route for real-time room state
+const handleRoomSync = (req: express.Request, res: express.Response) => {
+  const body = req.method === 'GET' ? req.query : req.body;
+  const roomCode = String(body.roomCode || 'CLASSROOM-101');
+  const studentId = String(body.studentId || '');
+  const studentName = String(body.studentName || '');
+  const studentGroup = String(body.studentGroup || '');
+  let risks: any[] = [];
+
+  try {
+    if (typeof body.risks === 'string') {
+      risks = JSON.parse(body.risks);
+    } else if (Array.isArray(body.risks)) {
+      risks = body.risks;
+    }
+  } catch (e) {}
+
   const room = getOrCreateRoom(roomCode);
-  
+  pruneStaleStudents(room);
+
   if (studentId || studentName) {
     upsertStudentSession(
       room,
       studentId,
       studentName || 'Anonymous Student',
       studentGroup || 'Risk Group',
-      risks || []
+      risks
     );
     broadcastRoomState(room);
   }
@@ -209,9 +235,13 @@ app.post("/api/room/sync", (req, res) => {
     success: true,
     roomCode: room.roomCode,
     activeStudentsCount: room.students.size,
-    students: studentsList
+    students: studentsList,
+    serverTime: Date.now()
   });
-});
+};
+
+app.post("/api/room/sync", handleRoomSync);
+app.get("/api/room/sync", handleRoomSync);
 
 // Server route for AI Risk Assessment Audit
 app.post("/api/evaluate-risk", async (req, res) => {
