@@ -2,6 +2,7 @@
 > **Academic Training & Financial Risk Simulation Platform**
 
 `F-EduRiskEvaluator` is an interactive web platform designed for students, lecturers, and risk management professionals. It enables structured financial risk modeling, real-time multi-user classroom collaboration, interactive analytics, and automated academic AI grading powered by **Google AI Studio Gemini API**.
+Link to watch: https://www.youtube.com/watch?v=FWkGKgRvGVQ
 
 ---
 
