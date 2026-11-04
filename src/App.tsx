@@ -253,41 +253,187 @@ export default function App() {
     }
   };
 
+  // Native jsPDF fallback generator in case html2canvas fails in strict security contexts
+  const generateNativePDF = (risksList: RiskAssessment[]) => {
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    
+    risksList.forEach((risk, index) => {
+      if (index > 0) {
+        pdf.addPage();
+      }
+
+      // Header
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(16);
+      pdf.setTextColor(0, 140, 168);
+      pdf.text('F-EduRiskEvaluator · Academic Risk Assessment Report', 14, 20);
+
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Risk Item ${index + 1} of ${risksList.length} | ID: ${risk.id} | Date: ${new Date().toLocaleDateString()}`, 14, 26);
+      
+      pdf.setDrawColor(226, 232, 240);
+      pdf.line(14, 29, 196, 29);
+
+      // Metadata Box
+      let y = 36;
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(14, y, 182, 16, 'F');
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(`Student: ${risk.studentName || 'Student Anonymous'}`, 18, y + 6);
+      pdf.text(`Group: ${risk.studentGroup || 'Risk Management Lecture'}`, 18, y + 12);
+      pdf.text(`Department: ${risk.department || 'IT & Cyber'}`, 110, y + 6);
+      pdf.text(`Severity: Level ${risk.severity}/5`, 110, y + 12);
+
+      y += 24;
+      // Section 1
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(14, 116, 144);
+      pdf.text(`1. RISK IDENTIFICATION & CLASSIFICATION (ITEM #${index + 1})`, 14, y);
+      pdf.line(14, y + 2, 196, y + 2);
+
+      y += 8;
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(51, 65, 85);
+      pdf.text('Risk Title / Description:', 14, y);
+      y += 5;
+      pdf.setFont('helvetica', 'normal');
+      const splitTitle = pdf.splitTextToSize(risk.riskExample || 'Not specified', 180);
+      pdf.text(splitTitle, 14, y);
+      y += splitTitle.length * 4.5 + 4;
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Root Cause & Drivers:', 14, y);
+      y += 5;
+      pdf.setFont('helvetica', 'normal');
+      const splitCause = pdf.splitTextToSize(risk.cause || 'Not specified', 180);
+      pdf.text(splitCause, 14, y);
+      y += splitCause.length * 4.5 + 4;
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Consequences & Impact:', 14, y);
+      y += 5;
+      pdf.setFont('helvetica', 'normal');
+      const splitConseq = pdf.splitTextToSize(risk.consequences || 'Not specified', 180);
+      pdf.text(splitConseq, 14, y);
+      y += splitConseq.length * 4.5 + 6;
+
+      // Section 2
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(14, 116, 144);
+      pdf.text('2. MITIGATION STRATEGY & SYNTHESIS', 14, y);
+      pdf.line(14, y + 2, 196, y + 2);
+
+      y += 8;
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(51, 65, 85);
+      pdf.text('Mitigation Strategy:', 14, y);
+      y += 5;
+      pdf.setFont('helvetica', 'normal');
+      const splitMit = pdf.splitTextToSize(risk.mitigationStrategy || 'Not specified', 180);
+      pdf.text(splitMit, 14, y);
+      y += splitMit.length * 4.5 + 4;
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Written Conclusion & Report:', 14, y);
+      y += 5;
+      pdf.setFont('helvetica', 'normal');
+      const splitConc = pdf.splitTextToSize(risk.conclusion || 'Not specified', 180);
+      pdf.text(splitConc, 14, y);
+      y += splitConc.length * 4.5 + 6;
+
+      // Section 3: AI Audit if present
+      if (risk.aiAudit) {
+        if (y > 230) {
+          pdf.addPage();
+          y = 20;
+        }
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(14, 116, 144);
+        pdf.text(`3. GOOGLE AI STUDIO AUDIT EVALUATION (Grade: ${risk.aiAudit.score}/10)`, 14, y);
+        pdf.line(14, y + 2, 196, y + 2);
+
+        y += 8;
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        const splitSummary = pdf.splitTextToSize(risk.aiAudit.summary, 180);
+        pdf.text(splitSummary, 14, y);
+      }
+    });
+
+    pdf.save(`Complete_Risk_Assessment_Report.pdf`);
+  };
+
   // PDF Download Generator
   const handleDownloadPDF = async () => {
-    if (!pdfReportRef.current) return;
-    const element = pdfReportRef.current;
+    try {
+      if (!pdfReportRef.current) {
+        generateNativePDF(risks);
+        return;
+      }
+      const element = pdfReportRef.current;
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff'
-    });
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: 800,
+        windowWidth: 1024,
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (clonedDoc) => {
+          const el = clonedDoc.getElementById('pdf-printable-report');
+          if (el) {
+            el.style.position = 'relative';
+            el.style.left = '0';
+            el.style.top = '0';
+            el.style.display = 'block';
+            el.style.visibility = 'visible';
+          }
+        }
+      });
 
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Canvas render width is 0');
+      }
 
-    const imgWidth = 210;
-    const pageHeight = 297;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
 
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
 
-    while (heightLeft >= 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
-    }
 
-    pdf.save(`Risk_Assessment_${currentRisk.id}.pdf`);
+      while (heightLeft >= 10) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`Complete_Risk_Assessment_Report.pdf`);
+    } catch (err) {
+      console.warn('HTML2Canvas rendering failed, falling back to native jsPDF layout generator:', err);
+      generateNativePDF(risks);
+    }
   };
 
   return (
@@ -471,15 +617,15 @@ export default function App() {
 
       {/* Hidden DOM element for offscreen PDF generation */}
       <PDFReportView
-        risk={currentRisk}
+        risks={risks}
         refProp={pdfReportRef}
       />
 
-      {/* Submission Modal */}
+      {/* Submission & PDF Download Modal */}
       <SubmissionModal
         isOpen={isSubmissionModalOpen}
         onClose={() => setIsSubmissionModalOpen(false)}
-        risk={currentRisk}
+        risks={risks}
         onDownloadPDF={handleDownloadPDF}
         onShowToast={showToast}
         theme={isDarkMode ? 'dark' : 'light'}

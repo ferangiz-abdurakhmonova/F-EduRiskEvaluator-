@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, BarChart3, FileEdit, Sparkles, BookOpen, Send, Sun, Moon, Users, Radio } from 'lucide-react';
+import { ShieldAlert, BarChart3, FileEdit, Sparkles, BookOpen, Download, Sun, Moon, Users, Radio } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'form' | 'dashboard' | 'classroom';
@@ -154,8 +154,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={onOpenSubmissionModal}
               className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl shadow-md shadow-cyan-600/25 ring-1 ring-cyan-400/30 transition-all whitespace-nowrap shrink-0 active:scale-95"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>Submit Report</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>Download Report PDF</span>
             </button>
           </div>
 
