@@ -23,7 +23,7 @@ export const SubmissionModal: React.FC<SubmissionModalProps> = ({
   const isDark = theme === 'dark';
   const [instructorEmail, setInstructorEmail] = useState<string>('nfatxulaevna@gmail.com');
   const [studentName, setStudentName] = useState<string>(
-    risk.studentName || `${risk.studentFirstName || 'Alex'} ${risk.studentLastName || 'Mercer'}`.trim()
+    risk.studentName || 'Alex Mercer'
   );
   const [studentGroup, setStudentGroup] = useState<string>(risk.studentGroup || 'CS-408 Enterprise Risk');
   const [notes, setNotes] = useState<string>('');

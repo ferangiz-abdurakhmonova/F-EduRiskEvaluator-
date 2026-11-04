@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RiskAssessment } from './types/risk';
+import { RiskAssessment, ScenarioTemplate } from './types/risk';
 import { Navbar } from './components/Navbar';
 import { RiskForm } from './components/RiskForm';
 import { AIAuditCard } from './components/AIAuditCard';
@@ -8,17 +8,10 @@ import { PDFReportView } from './components/PDFReportView';
 import { SubmissionModal } from './components/SubmissionModal';
 import { ClassroomRoomModal } from './components/ClassroomRoomModal';
 import { ClassroomLiveDashboard } from './components/ClassroomLiveDashboard';
+import { useRealtimeRoom } from './hooks/useRealtimeRoom';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
-
-interface StudentPeer {
-  studentId: string;
-  studentName: string;
-  studentGroup: string;
-  risks: RiskAssessment[];
-  lastActive: number;
-}
 
 export default function App() {
   const STORAGE_KEY = 'student_risk_assessments_v4';
@@ -39,7 +32,6 @@ export default function App() {
       return `STD-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     }
   });
-  const [activePeers, setActivePeers] = useState<StudentPeer[]>([]);
 
   // Blank risk creator helper
   const createBlankRisk = (indexNumber: number = 1): RiskAssessment => ({
@@ -77,6 +69,18 @@ export default function App() {
   const [activeRiskIndex, setActiveRiskIndex] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'form' | 'dashboard' | 'classroom'>('form');
 
+  // Real-time Cloud Firestore & Fallback Sync Hook
+  const currentStudentName = risks[0]?.studentName || '';
+  const currentStudentGroup = risks[0]?.studentGroup || '';
+
+  const { activePeers, syncNow } = useRealtimeRoom({
+    roomCode,
+    studentId,
+    studentName: currentStudentName,
+    studentGroup: currentStudentGroup,
+    risks
+  });
+
   // Modals & States
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState<boolean>(false);
@@ -85,8 +89,6 @@ export default function App() {
   // Toast State
   const [toast, setToast] = useState<{ message: string; type: 'warning' | 'success' | 'info' } | null>(null);
 
-  // WebSocket Ref
-  const wsRef = useRef<WebSocket | null>(null);
   const pdfReportRef = useRef<HTMLDivElement | null>(null);
 
   // Save to local storage on change
@@ -97,116 +99,6 @@ export default function App() {
       console.error('Failed to save to local storage', e);
     }
   }, [risks]);
-
-  // Real-Time Classroom WebSocket Connection
-  useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/classroom`;
-
-    function connectWS() {
-      try {
-        const socket = new WebSocket(wsUrl);
-        wsRef.current = socket;
-
-        socket.onopen = () => {
-          socket.send(JSON.stringify({
-            type: 'join_room',
-            roomCode,
-            studentId,
-            studentName: risks[0]?.studentName || 'Student Anonymous',
-            studentGroup: risks[0]?.studentGroup || 'Risk Group',
-            risks
-          }));
-        };
-
-        // Activity heartbeat pulse every 15 seconds to update lastActive timestamp
-        const pulseInterval = setInterval(() => {
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-              type: 'activity_pulse',
-              roomCode,
-              studentId,
-              studentName: risks[0]?.studentName || 'Student Anonymous',
-              studentGroup: risks[0]?.studentGroup || 'Risk Group'
-            }));
-          }
-        }, 15000);
-
-        socket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'room_state' && Array.isArray(data.students)) {
-              setActivePeers(data.students);
-            }
-          } catch (e) {
-            console.error('WS Parse Error', e);
-          }
-        };
-
-        socket.onclose = () => {
-          clearInterval(pulseInterval);
-          setTimeout(connectWS, 3000);
-        };
-      } catch (err) {
-        console.error('WS Connection error', err);
-      }
-    }
-
-    connectWS();
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, [roomCode]);
-
-  // Sync risks & fetch connected peers continuously (every 4 seconds + on change)
-  useEffect(() => {
-    const doSync = () => {
-      const studentName = risks[0]?.studentName || 'Student Anonymous';
-      const studentGroup = risks[0]?.studentGroup || 'Risk Group';
-
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'update_risks',
-          roomCode,
-          studentId,
-          studentName,
-          studentGroup,
-          risks
-        }));
-      }
-
-      // HTTP Polling sync fallback
-      fetch('/api/room/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomCode,
-          studentId,
-          studentName,
-          studentGroup,
-          risks
-        })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data && Array.isArray(data.students)) {
-            setActivePeers(data.students);
-          }
-        })
-        .catch(() => {});
-    };
-
-    // Immediate sync on load or state update
-    doSync();
-
-    // Continuous 4-second polling timer
-    const pollInterval = setInterval(doSync, 4000);
-
-    return () => clearInterval(pollInterval);
-  }, [risks, roomCode, studentId]);
 
   // Toggle body dark class
   useEffect(() => {
@@ -549,6 +441,7 @@ export default function App() {
         risk={currentRisk}
         onDownloadPDF={handleDownloadPDF}
         onShowToast={showToast}
+        theme={isDarkMode ? 'dark' : 'light'}
       />
 
       {/* Classroom Room PIN Modal */}

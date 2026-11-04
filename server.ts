@@ -133,8 +133,9 @@ wss.on('connection', (ws) => {
       const msg = JSON.parse(messageRaw.toString());
 
       if (msg.type === 'join_room') {
-        currentRoomCode = (msg.roomCode || 'CLASSROOM-101').toUpperCase().trim();
-        const room = getOrCreateRoom(currentRoomCode);
+        const roomCode = (msg.roomCode || 'CLASSROOM-101').toUpperCase().trim();
+        currentRoomCode = roomCode;
+        const room = getOrCreateRoom(roomCode);
         room.wsClients.add(ws);
 
         currentStudentId = upsertStudentSession(

@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "studentSession": {
+      "title": "Student Session",
+      "description": "Active student presence and submitted risk assessments in a classroom room",
+      "type": "object",
+      "properties": {
+        "studentId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "studentGroup": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "lastActive": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["studentId", "studentName", "lastActive"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomCode}/students/{studentId}": {
+      "schema": "studentSession",
+      "description": "Subcollection storing real-time student activity and risks per classroom room"
+    }
+  }
+}
