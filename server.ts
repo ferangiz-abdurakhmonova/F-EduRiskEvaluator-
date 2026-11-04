@@ -244,7 +244,68 @@ const handleRoomSync = (req: express.Request, res: express.Response) => {
 app.post("/api/room/sync", handleRoomSync);
 app.get("/api/room/sync", handleRoomSync);
 
+function isGibberish(text: string): boolean {
+  if (!text) return true;
+  const cleaned = text.trim();
+  if (cleaned.length < 5) return true;
+
+  const lower = cleaned.toLowerCase();
+
+  // Extract letters (latin + cyrillic)
+  const lettersOnly = lower.replace(/[^a-zа-яё]/gi, '');
+  if (lettersOnly.length === 0) return true;
+
+  // Check unique character count vs length
+  const uniqueChars = new Set(lettersOnly).size;
+  if (uniqueChars <= 3 && lettersOnly.length >= 5) return true;
+
+  // Check vowel ratio
+  const vowels = lower.match(/[aeiouyаеёиоуыэюя]/gi) || [];
+  const vowelRatio = vowels.length / lettersOnly.length;
+  if (vowels.length === 0 || vowelRatio < 0.15) return true;
+
+  // 4 or more consecutive consonants
+  const consonantCluster = /[bcdfghjklmnpqrstvwxzбвгджзйклмнпрстфхцчшщ]{4,}/i;
+  if (consonantCluster.test(lower)) return true;
+
+  // Keyboard row sequence patterns
+  const mashPatterns = [
+    'qwerty', 'asdfgh', 'zxcvbn', 'qwert', 'asdfg', 'zxcvb',
+    'yuiop', 'hjkl', 'bnm', 'fghj', 'dfgh', 'fgb', 'gbf'
+  ];
+  if (mashPatterns.some(pattern => lower.includes(pattern))) return true;
+
+  return false;
+}
+
 function generateFallbackAudit(risk: any) {
+  const isAnyGibberish = 
+    isGibberish(risk.riskExample) || 
+    isGibberish(risk.cause) || 
+    isGibberish(risk.mitigationStrategy) ||
+    isGibberish(risk.conclusion);
+
+  if (isAnyGibberish) {
+    const offendingText = (risk.mitigationStrategy || risk.riskExample || risk.cause || 'input').trim();
+    return {
+      score: 0,
+      summary: `Academic Audit Grade: 0/10. The submitted text contains invalid or non-academic gibberish ("${offendingText.slice(0, 30)}"). Academic evaluation requires structured, professional financial risk analysis.`,
+      strengths: [
+        'Form submission mechanism successfully logged the entry attempt.'
+      ],
+      logicalFlaws: [
+        `The input field contains random character mashing or gibberish: "${offendingText.slice(0, 30)}" - lacks required academic terminology.`,
+        'No quantifiable financial impact, root causes, or mitigation mechanisms were identified.'
+      ],
+      recommendations: [
+        'Professional Example: "Liquidity risk arising from a cash outflow mismatch (Cash Outflow > Cash Inflow during peak settlement periods)..."',
+        'Specify Key Risk Indicators (KRIs), Liquidity Coverage Ratios (LCR), or Value at Risk (VaR) parameters.',
+        'Cite recognized Enterprise Risk Management (ERM) frameworks (e.g., COSO ERM, ISO 31000).'
+      ],
+      evaluatedAt: new Date().toISOString()
+    };
+  }
+
   const causeLength = (risk.cause || '').length;
   const strategyLength = (risk.mitigationStrategy || '').length;
   const conclusionLength = (risk.conclusion || '').length;
@@ -258,20 +319,20 @@ function generateFallbackAudit(risk: any) {
 
   return {
     score,
-    summary: `Student analysis correctly identifies a Level ${severityNum}/5 risk within ${risk.department || 'Operations'}. The proposed mitigation strategy addresses immediate root causes, though long-term verification mechanisms should be strengthened.`,
+    summary: `Academic Audit: Score ${score}/10. Student response identifies a Level ${severityNum}/5 risk in the "${risk.department || 'Operations'}" department. The quoted strategy "${(risk.mitigationStrategy || '').slice(0, 40)}..." addresses primary root causes but requires enhanced operational controls.`,
     strengths: [
-      `Clear identification of responsible role (${risk.responsiblePerson || 'Assigned Officer'}) for execution.`,
-      `Structured resolution timeframe (${risk.resolutionTimeframe || 'Immediate'}) aligns with stated severity level.`,
-      `Specific focus on root cause mitigation in ${risk.department || 'the target department'}.`
+      `Specific assignment of responsible officer: "${risk.responsiblePerson || 'Assigned Officer'}".`,
+      `Establishes a resolution timeframe: "${risk.resolutionTimeframe || 'Immediate'}".`,
+      `Focuses on risk mitigation in the "${risk.department || 'Target Dept'}" division.`
     ],
     logicalFlaws: [
-      `Potential delay between fixation date (${risk.fixationDate || 'Discovery'}) and occurrence date (${risk.occurrenceDate || 'Manifested'}).`,
-      `Contingency budget and quantitative impact threshold could be defined in greater detail.`
+      `Timeline gap between discovery date (${risk.fixationDate || 'Discovery'}) and event manifestation date (${risk.occurrenceDate || 'Manifested'}).`,
+      `Insufficient quantitative financial damage breakdown provided.`
     ],
     recommendations: [
-      `Establish key risk indicators (KRIs) to measure mitigation progress weekly.`,
-      `Define escalation protocols if resolution timeframe exceeds target schedule.`,
-      `Conduct a post-implementation review with department stakeholders to verify risk abatement.`
+      `Enhancement Example: "Implement weekly KRI monitoring with a strict 5% tolerance threshold..."`,
+      `Define an escalation protocol for target resolution date overruns.`,
+      `Conduct a post-implementation audit with key financial stakeholders.`
     ],
     evaluatedAt: new Date().toISOString()
   };
@@ -290,42 +351,53 @@ app.post("/api/evaluate-risk", async (req, res) => {
       return res.json({ success: true, audit: fallback });
     }
 
+    const systemInstruction = `
+You are a strict academic evaluator and financial risk management expert. Your task is to evaluate the student's risk assessment submission on a 0 to 10 scale.
+
+CRITICAL EVALUATION & SCORING RULES (ENGLISH ONLY):
+1. LANGUAGE: ALL fields in your JSON response (summary, strengths, logicalFlaws, recommendations) MUST BE WRITTEN EXCLUSIVELY IN ENGLISH.
+2. GIBBERISH / INVALID INPUT DETECTION: If any field (such as Risk Example, Cause, or Mitigation Strategy) contains random characters, keyboard mashing, nonsense text (e.g., "fgbfgb", "qwerty", single letters, meaningless words), or lacks real academic content, YOU MUST ASSIGN A SCORE OF EXACTLY 0 (0/10). DO NOT give a passing grade (e.g. 6/10) for gibberish!
+3. DIRECT CITATIONS: Always quote the exact words from the student's response when pointing out strengths or flaws.
+4. ANALYSIS & FLAWS: Clearly detail what is flawed, missing, or academically unacceptable in the student's answer.
+5. PROFESSIONAL EXAMPLES: In the recommendations field, provide professional, real-world risk management examples and frameworks (e.g. KRI, LCR, VaR, ERM standards).
+
+Output ONLY raw structured JSON matching the requested schema. Do NOT include markdown code fences or backticks.
+`;
+
     const prompt = `
-You are a Senior Chief Risk Officer and University Risk Management Professor evaluating a student's risk assessment submission.
-Be thorough, objective, constructive, and realistic.
+Evaluate the following student financial risk assessment:
 
-Student Risk Assessment Submission:
-- Risk Example / Description: ${risk.riskExample}
-- Root Cause & Drivers: ${risk.cause}
-- Influence, Impact & Consequences: ${risk.consequences || 'Not specified'}
-- Fixation Date (Discovered): ${risk.fixationDate}
-- Occurrence Date (Manifested/Projected): ${risk.occurrenceDate}
-- Responsible Role / Person: ${risk.responsiblePerson}
-- Severity Level (1-5): ${risk.severity}
-- Assigned Department: ${risk.department}
-- Resolution Timeframe: ${risk.resolutionTimeframe}
-- Student Mitigation Strategy: ${risk.mitigationStrategy}
-- Student Conclusion & Synthesis Report: ${risk.conclusion}
+Student Submission Data:
+- Risk Description / Example: "${risk.riskExample || ''}"
+- Root Causes: "${risk.cause || ''}"
+- Impact & Consequences: "${risk.consequences || 'Not provided'}"
+- Discovery Date: ${risk.fixationDate || 'Not specified'}
+- Manifested Date: ${risk.occurrenceDate || 'Not specified'}
+- Responsible Officer: "${risk.responsiblePerson || ''}"
+- Severity Rating (1-5): ${risk.severity || 3}
+- Department: "${risk.department || ''}"
+- Resolution Timeframe: "${risk.resolutionTimeframe || ''}"
+- Mitigation Strategy: "${risk.mitigationStrategy || ''}"
+- Conclusion: "${risk.conclusion || ''}"
 
-Please evaluate the submission:
-1. Grade score from 1 to 10 based on logic, completeness, cause-and-effect coherence, severity alignment with stated consequences, and mitigation feasibility.
-2. Provide a concise executive evaluation summary (2-3 sentences).
-3. List 2-3 specific strengths of the student's analysis.
-4. List 1-3 logical flaws or oversights (e.g. underestimating consequences, unrealistic timeframe, wrong department accountability, missing contingency plans, superficial conclusion).
-5. List 3 concrete action recommendations to strengthen this risk mitigation strategy.
+Evaluation Instructions:
+1. First, check if any field contains gibberish, random letters (e.g., "fgbfgb", "asdf"), or trivial placeholder text. If so, set score = 0 immediately.
+2. Provide all output text strictly in ENGLISH.
+3. Quote specific student phrases in strengths and logical flaws.
+4. Offer concrete professional recommendations and formulas/metrics for improvement.
 `;
 
     const reqConfig = {
-      systemInstruction: "You are an expert risk auditor evaluating student risk assessments. Output ONLY raw structured JSON matching the requested schema. Do NOT include markdown formatting or backticks.",
+      systemInstruction,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          score: { type: Type.INTEGER, description: "Grade score from 1 to 10" },
-          summary: { type: Type.STRING, description: "Executive evaluation summary" },
-          strengths: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Strengths of the strategy" },
-          logicalFlaws: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Flaws or oversights" },
-          recommendations: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Action recommendations" }
+          score: { type: Type.INTEGER, description: "Grade score from 0 to 10" },
+          summary: { type: Type.STRING, description: "Executive evaluation summary with student quotes" },
+          strengths: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Strengths with direct student quotes" },
+          logicalFlaws: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Logical flaws with quotes and error analysis" },
+          recommendations: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Action recommendations with professional examples" }
         },
         required: ["score", "summary", "strengths", "logicalFlaws", "recommendations"]
       }
@@ -359,6 +431,11 @@ Please evaluate the submission:
       console.error("JSON parse error on Gemini response:", cleanedText);
       const fallback = generateFallbackAudit(risk);
       return res.json({ success: true, audit: fallback });
+    }
+
+    // Overriding score if gibberish detected programmatically
+    if (isGibberish(risk.riskExample) || isGibberish(risk.cause) || isGibberish(risk.mitigationStrategy)) {
+      auditResult = generateFallbackAudit(risk);
     }
 
     auditResult.evaluatedAt = new Date().toISOString();
