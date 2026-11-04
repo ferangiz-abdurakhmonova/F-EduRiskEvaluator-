@@ -249,7 +249,7 @@ app.post("/api/evaluate-risk", async (req, res) => {
   try {
     const risk = req.body;
     if (!risk || !risk.riskExample) {
-      return res.status(400).json({ error: "Missing risk evaluation data." });
+      return res.status(400).json({ success: false, error: "Missing risk evaluation data." });
     }
 
     const prompt = `
@@ -281,7 +281,7 @@ Please evaluate the submission:
       model: "gemini-3.8-flash",
       contents: prompt,
       config: {
-        systemInstruction: "You are an expert risk auditor evaluating student risk assessments. Output clean structured JSON matching the requested schema.",
+        systemInstruction: "You are an expert risk auditor evaluating student risk assessments. Output ONLY raw structured JSON matching the requested schema. Do NOT include markdown formatting or backticks.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -297,14 +297,29 @@ Please evaluate the submission:
       }
     });
 
-    const responseText = response.text || "{}";
-    const auditResult = JSON.parse(responseText);
+    const rawText = response.text || "{}";
+    const cleanedText = rawText
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
+
+    let auditResult: any;
+    try {
+      auditResult = JSON.parse(cleanedText);
+    } catch (parseErr) {
+      console.error("JSON parse error on Gemini response:", cleanedText);
+      return res.status(500).json({
+        success: false,
+        error: "AI evaluation response was not valid JSON format. Please try again."
+      });
+    }
+
     auditResult.evaluatedAt = new Date().toISOString();
 
     return res.json({ success: true, audit: auditResult });
   } catch (error: any) {
     console.error("Risk evaluation error:", error);
-    return res.status(500).json({ error: error.message || "Failed to evaluate risk with AI" });
+    return res.status(500).json({ success: false, error: error.message || "Failed to evaluate risk with AI" });
   }
 });
 

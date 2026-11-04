@@ -87,7 +87,12 @@ export default function App() {
   const [isRoomModalOpen, setIsRoomModalOpen] = useState<boolean>(false);
 
   // Toast State
-  const [toast, setToast] = useState<{ message: string; type: 'warning' | 'success' | 'info' } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'warning' | 'success' | 'info';
+    actionLabel?: string;
+    onAction?: () => void;
+  } | null>(null);
 
   const pdfReportRef = useRef<HTMLDivElement | null>(null);
 
@@ -113,11 +118,16 @@ export default function App() {
   const safeActiveIndex = Math.min(Math.max(0, activeRiskIndex), Math.max(0, risks.length - 1));
   const currentRisk = risks[safeActiveIndex] || risks[0] || createBlankRisk(1);
 
-  const showToast = (message: string, type: 'warning' | 'success' | 'info' = 'info') => {
-    setToast({ message, type });
+  const showToast = (
+    message: string,
+    type: 'warning' | 'success' | 'info' = 'info',
+    actionLabel?: string,
+    onAction?: () => void
+  ) => {
+    setToast({ message, type, actionLabel, onAction });
     setTimeout(() => {
       setToast(null);
-    }, 5000);
+    }, 7000);
   };
 
   const handleUpdateCurrentRisk = (updated: RiskAssessment) => {
@@ -203,7 +213,21 @@ export default function App() {
         body: JSON.stringify(currentRisk)
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = {};
+
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (parseErr) {
+          throw new Error('Invalid JSON format returned from server.');
+        }
+      } else {
+        const textContent = await response.text();
+        console.error('Received non-JSON endpoint response:', textContent);
+        throw new Error(`Server returned non-JSON response (${response.status}).`);
+      }
+
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'AI Evaluation endpoint error');
       }
@@ -218,7 +242,12 @@ export default function App() {
       showToast(`AI Audit complete for Risk #${safeActiveIndex + 1}! Score: ${data.audit.score}/10`, 'success');
     } catch (error: any) {
       console.error('Evaluate AI Error:', error);
-      showToast(`AI Audit failed: ${error.message || 'Server error'}`, 'warning');
+      showToast(
+        `AI Audit issue: ${error.message || 'Server error'}.`,
+        'warning',
+        'Retry Audit',
+        () => handleEvaluateAI()
+      );
     } finally {
       setIsEvaluating(false);
     }
@@ -283,6 +312,18 @@ export default function App() {
             <div className="flex-1 text-xs leading-relaxed">
               {toast.message}
             </div>
+
+            {toast.actionLabel && toast.onAction && (
+              <button
+                onClick={() => {
+                  toast.onAction?.();
+                  setToast(null);
+                }}
+                className="px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors shrink-0"
+              >
+                {toast.actionLabel}
+              </button>
+            )}
 
             <button
               onClick={() => setToast(null)}
